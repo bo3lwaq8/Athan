@@ -74,9 +74,26 @@ latitude ~45.5°N, same timezone, so times are nearly identical).
 3. Optionally expose the high-latitude rule as a Settings dropdown.
 4. Rebuild via `build.bat` and re-test in Portland.
 
+## Auto-update (GitHub Releases) — added 2026-07-01
+- Repo: **https://github.com/bo3lwaq8/Athan** (public — release assets must be
+  public so any user's app can download updates without credentials).
+- The exe checks `releases/latest` on launch and, if the tag is newer than the
+  `VERSION` constant in `athan.py`, offers to update (ask-first dialog), then
+  downloads the new `Athan.exe` and swaps itself via a detached `athan_update.bat`
+  (a running exe can't overwrite itself, so the helper waits for exit by PID,
+  replaces the exe, and relaunches). Update code only runs in the frozen exe.
+- **Release checklist when you change the code:**
+  1. Bump `VERSION` in `athan.py` (e.g. `1.0.0` -> `1.0.1`).
+  2. `build.bat` (or the PyInstaller onefile command) -> `dist\Athan.exe`.
+  3. `gh release create v1.0.1 dist\Athan.exe --title "Athan v1.0.1" --notes "..."`
+     (asset MUST be named exactly `Athan.exe`).
+  4. Every installed copy auto-updates on its next launch. No more hand-sending.
+- Future option: a GitHub Actions workflow could build the exe in the cloud on
+  each tag, removing even the local build step.
+
 ## Build / run notes
-- A built `.exe` does NOT auto-update — must re-run `build.bat` after code changes.
-- To test without building: `python athan.py`.
+- To test without building: `python athan.py` (dev runs skip the updater).
 - Real settings persist in `config.json` next to the exe (in `dist\`), separate
-  from the exe, so they survive rebuilds.
-- Claude is connected to the folder `C:\Users\alaso\Downloads\Athan-app`.
+  from the exe, so they survive rebuilds and updates.
+- Claude is connected to the folder
+  `C:\Users\alaso\OneDrive\Documents\Claude\Projects\Athan`.
