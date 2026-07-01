@@ -74,6 +74,16 @@ latitude ~45.5°N, same timezone, so times are nearly identical).
 3. Optionally expose the high-latitude rule as a Settings dropdown.
 4. Rebuild via `build.bat` and re-test in Portland.
 
+## Dhikr reminders — added 2026-07-01 (v1.1.0)
+- After each prayer (default **8 min** after the prayer time, `dhikr_after_minutes`),
+  a small popup shows **one random** post-salah dhikr from `DHIKR_REMINDERS`
+  (Subhanallah 'adada khalqihi… / Astaghfirullah / La ilaha illa Allah wahdah…).
+- Toggle: Settings → "Show dhikr reminder after each prayer" (`dhikr_reminders`).
+- De-duped per prayer per day via `self.dhikr_shown`; cleared on day rollover
+  and on settings save. Auto-closes after 90s.
+- Note: earlier a *fade-in* dhikr popup was removed; this is the new, opt-out,
+  post-prayer version the user asked for.
+
 ## Auto-update (GitHub Releases) — added 2026-07-01
 - Repo: **https://github.com/bo3lwaq8/Athan** (public — release assets must be
   public so any user's app can download updates without credentials).

@@ -22,6 +22,7 @@ import sys
 import json
 import time
 import ctypes
+import random
 import datetime as dt
 import threading
 import tkinter as tk
@@ -68,13 +69,20 @@ LAT_ADJUST = {
 
 PRAYERS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 
+# Post-salah adhkar. A random one is shown a few minutes after each prayer.
+DHIKR_REMINDERS = [
+    "سبحان الله عدد خلقه ورضا نفسه وزنة عرشه ومداد كلماته",
+    "أستغفر الله",
+    "لا إله إلا الله وحده لا شريك له، له الملك وله الحمد وهو على كل شيء قدير",
+]
+
 APP_NAME = "Athan"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 # ---- auto-update (GitHub Releases) ----
 # Bump VERSION every time you cut a new release; the running app compares this
 # to the latest release tag and offers to update itself. See build.bat / README.
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 GITHUB_OWNER = "bo3lwaq8"
 GITHUB_REPO = "Athan"
 RELEASES_API = (f"https://api.github.com/repos/{GITHUB_OWNER}/"
@@ -106,6 +114,8 @@ DEFAULT_CONFIG = {
     "lock_workstation": True,
     "show_overlay": True,
     "play_audio": True,
+    "dhikr_reminders": True,      # show a post-salah dhikr after each prayer
+    "dhikr_after_minutes": 8,     # how long after the prayer time to show it
     "first_run": True,
 }
 
@@ -380,6 +390,7 @@ class AthanApp:
         self.times = {}
         self.notified = set()
         self.fired = set()
+        self.dhikr_shown = set()
         self.today = dt.date.today()
         self._stop = False
         self.overlay = None
@@ -461,6 +472,7 @@ class AthanApp:
             self.today = now.date()
             self.notified.clear()
             self.fired.clear()
+            self.dhikr_shown.clear()
             self.refresh_times()
         self.root.after(1000, self._tick_clock)
 
@@ -580,6 +592,7 @@ class AthanApp:
             return
         now = dt.datetime.now()
         before = int(self.cfg.get("notify_minutes_before", 15))
+        dhikr_after = int(self.cfg.get("dhikr_after_minutes", 8))
         for p in PRAYERS:
             t = self.times.get(p)
             if not t:
@@ -587,6 +600,7 @@ class AthanApp:
             when = self._today_at(t, now)
             notify_at = when - dt.timedelta(minutes=before)
             nkey, fkey = f"{self.today}-{p}-notify", f"{self.today}-{p}-fire"
+            dkey = f"{self.today}-{p}-dhikr"
 
             if nkey not in self.notified and notify_at <= now < notify_at + dt.timedelta(seconds=90):
                 self.notified.add(nkey)
@@ -595,6 +609,13 @@ class AthanApp:
             if fkey not in self.fired and when <= now < when + dt.timedelta(seconds=90):
                 self.fired.add(fkey)
                 self.root.after(0, lambda pp=p: self.trigger_athan(pp))
+
+            # A few minutes after the prayer time, show a random post-salah dhikr.
+            dhikr_at = when + dt.timedelta(minutes=dhikr_after)
+            if (self.cfg.get("dhikr_reminders", True) and dkey not in self.dhikr_shown
+                    and dhikr_at <= now < dhikr_at + dt.timedelta(seconds=90)):
+                self.dhikr_shown.add(dkey)
+                self.root.after(0, self.show_dhikr_reminder)
 
     # ---------- actions ----------
     def show_notification(self, prayer, minutes):
@@ -610,6 +631,25 @@ class AthanApp:
         tk.Button(top, text="OK", command=top.destroy, bg="#e9c46a", fg="#0d1b2a",
                   relief="flat", padx=20, pady=4).pack(pady=12)
         top.after(60000, top.destroy)
+
+    def show_dhikr_reminder(self):
+        """A gentle post-salah reminder showing one random dhikr."""
+        if not self.cfg.get("dhikr_reminders", True):
+            return
+        phrase = random.choice(DHIKR_REMINDERS)
+        top = tk.Toplevel(self.root)
+        top.title("Dhikr")
+        top.configure(bg="#1b263b")
+        top.attributes("-topmost", True)
+        top.geometry("480x240")
+        tk.Label(top, text="📿  ذِكر", font=("Segoe UI", 16, "bold"),
+                 bg="#1b263b", fg="#e9c46a").pack(pady=(20, 10))
+        tk.Label(top, text=phrase, font=("Segoe UI", 17), bg="#1b263b",
+                 fg="#e0e1dd", wraplength=430, justify="center").pack(padx=24, pady=8)
+        tk.Button(top, text="آمين", command=top.destroy, bg="#e9c46a", fg="#0d1b2a",
+                  font=("Segoe UI", 11, "bold"), relief="flat",
+                  padx=28, pady=6).pack(pady=16)
+        top.after(90000, top.destroy)   # auto-close after 90s if ignored
 
     def trigger_athan(self, prayer="Test"):
         if self.cfg.get("play_audio", True):
@@ -807,6 +847,7 @@ class AthanApp:
         lock_var = tk.BooleanVar(value=self.cfg["lock_workstation"])
         overlay_var = tk.BooleanVar(value=self.cfg["show_overlay"])
         audio_var = tk.BooleanVar(value=self.cfg["play_audio"])
+        dhikr_var = tk.BooleanVar(value=self.cfg.get("dhikr_reminders", True))
         auto_loc_var = tk.BooleanVar(value=self.cfg.get("use_coordinates", False))
         autostart_var = tk.BooleanVar(value=is_autostart_enabled())
 
@@ -818,6 +859,7 @@ class AthanApp:
         chk("Lock workstation at athan", lock_var)
         chk("Show fullscreen overlay", overlay_var)
         chk("Play athan audio", audio_var)
+        chk("Show dhikr reminder after each prayer", dhikr_var)
         chk("Use auto-detected GPS coordinates", auto_loc_var)
         chk("Start Athan when Windows starts", autostart_var)
 
@@ -832,6 +874,7 @@ class AthanApp:
                 "lock_workstation": lock_var.get(),
                 "show_overlay": overlay_var.get(),
                 "play_audio": audio_var.get(),
+                "dhikr_reminders": dhikr_var.get(),
                 "use_coordinates": auto_loc_var.get(),
                 "first_run": False,
             })
@@ -839,6 +882,7 @@ class AthanApp:
             save_config(self.cfg)
             self.notified.clear()
             self.fired.clear()
+            self.dhikr_shown.clear()
             win.destroy()
             self.refresh_times()
 
