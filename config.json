@@ -1,0 +1,16 @@
+{
+  "city": "Makkah",
+  "country": "Saudi Arabia",
+  "latitude": null,
+  "longitude": null,
+  "use_coordinates": false,
+  "auto_location": true,
+  "method": "ISNA",
+  "latitude_adjustment": "Angle Based",
+  "notify_minutes_before": 15,
+  "snooze_minutes": 5,
+  "lock_workstation": true,
+  "show_overlay": true,
+  "play_audio": true,
+  "first_run": true
+}
