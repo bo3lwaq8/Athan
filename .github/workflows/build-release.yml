@@ -1,0 +1,52 @@
+name: Build Athan exe
+
+# Cloud build so you don't have to run build.bat locally.
+#
+# - Push to the `testing` branch  -> builds the exe and uploads it as a
+#   downloadable "artifact" only (no public release). Use this to check the
+#   build works.
+# - Push a version tag like `v1.0.1` -> builds the exe AND publishes a GitHub
+#   Release with Athan.exe attached, which is what the app's auto-updater pulls.
+on:
+  push:
+    branches:
+      - testing
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create the Release on a tag push
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        run: python -m pip install --upgrade pip requests winsdk pyinstaller
+
+      - name: Build Athan.exe
+        # Same flags as build.bat: single windowed exe, bundle requests + winsdk.
+        run: pyinstaller --onefile --noconsole --name Athan --collect-all requests --collect-all winsdk athan.py
+
+      - name: Upload exe as build artifact (for testing)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Athan-exe
+          path: dist/Athan.exe
+
+      - name: Publish Release (only on a version tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Athan.exe
+          # Asset must be named exactly Athan.exe for the in-app updater to find it.
+          generate_release_notes: true
