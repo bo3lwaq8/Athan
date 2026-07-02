@@ -82,11 +82,15 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 # ---- auto-update (GitHub Releases) ----
 # Bump VERSION every time you cut a new release; the running app compares this
 # to the latest release tag and offers to update itself. See build.bat / README.
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # Patch notes shown on the admin-only "Patch Notes" page (newest first).
 # Each release: add an entry at the TOP and bump VERSION to match it.
 CHANGELOG = [
+    ("1.2.0", "2026-07-01", [
+        "Show the app version under the title.",
+        "Admin-only Patch Notes page (version history), unlocked by an admin.key file.",
+    ]),
     ("1.1.0", "2026-07-01", [
         "Post-salah dhikr reminder (one random dhikr after each prayer).",
         "Auto-update via GitHub Releases (checks on launch).",
