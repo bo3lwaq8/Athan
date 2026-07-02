@@ -9,3 +9,6 @@ dist/
 
 # Local runtime settings written next to the exe
 # (config.json here is the shipped DEFAULT; real user settings live by the exe)
+
+# Admin marker: presence unlocks the Patch Notes page. Never commit or ship it.
+admin.key

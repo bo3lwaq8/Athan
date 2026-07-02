@@ -83,6 +83,23 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 # Bump VERSION every time you cut a new release; the running app compares this
 # to the latest release tag and offers to update itself. See build.bat / README.
 VERSION = "1.1.0"
+
+# Patch notes shown on the admin-only "Patch Notes" page (newest first).
+# Each release: add an entry at the TOP and bump VERSION to match it.
+CHANGELOG = [
+    ("1.1.0", "2026-07-01", [
+        "Post-salah dhikr reminder (one random dhikr after each prayer).",
+        "Auto-update via GitHub Releases (checks on launch).",
+    ]),
+    ("1.0.0", "2026-06-24", [
+        "Initial release: prayer times with a 15-minute warning before each prayer.",
+        "Fullscreen overlay + Windows lock at athan time; 'I finished praying' gate.",
+        "Auto-location (Windows GPS/WiFi + IP fallback) and city search.",
+        "High-latitude Fajr/Isha rule; ISNA default calculation method.",
+        "Start-with-Windows toggle.",
+    ]),
+]
+
 GITHUB_OWNER = "bo3lwaq8"
 GITHUB_REPO = "Athan"
 RELEASES_API = (f"https://api.github.com/repos/{GITHUB_OWNER}/"
@@ -99,6 +116,14 @@ def app_dir():
 
 CONFIG_PATH = os.path.join(app_dir(), "config.json")
 AUDIO_PATH = os.path.join(app_dir(), "athan.wav")  # optional, place your own
+# Admin marker: if this file sits next to the app, the "Patch Notes" page is
+# shown. Only the developer's copy has it; public downloads never do.
+ADMIN_KEY_PATH = os.path.join(app_dir(), "admin.key")
+
+
+def is_admin():
+    """True only on the developer's copy (an admin.key file sits beside the app)."""
+    return os.path.exists(ADMIN_KEY_PATH)
 
 DEFAULT_CONFIG = {
     "city": "Makkah",
@@ -422,6 +447,9 @@ class AthanApp:
         tk.Label(self.root, text="☪  Athan", font=("Segoe UI", 26, "bold"),
                  bg=bg, fg=accent).pack(pady=(18, 2))
 
+        tk.Label(self.root, text=f"v{VERSION}", font=("Segoe UI", 9),
+                 bg=bg, fg="#778da9").pack()
+
         self.loc_label = tk.Label(self.root, text="", font=("Segoe UI", 11), bg=bg, fg=fg)
         self.loc_label.pack()
 
@@ -457,6 +485,10 @@ class AthanApp:
         tk.Button(btns, text="Test athan", command=lambda: self.trigger_athan(),
                   bg="#577590", fg="#e0e1dd", font=("Segoe UI", 10, "bold"),
                   relief="flat", padx=14, pady=6).pack(side="left", padx=6)
+        if is_admin():
+            tk.Button(btns, text="Patch Notes", command=self.open_patch_notes,
+                      bg="#2a9d8f", fg="#e0e1dd", font=("Segoe UI", 10, "bold"),
+                      relief="flat", padx=14, pady=6).pack(side="left", padx=6)
 
         self.status = tk.Label(self.root, text="", font=("Segoe UI", 9),
                                bg=bg, fg="#778da9")
@@ -718,6 +750,49 @@ class AthanApp:
     def _do_lock(self):
         if self.cfg.get("lock_workstation", True):
             lock_workstation()
+
+    # ---------- patch notes (admin only) ----------
+    def open_patch_notes(self):
+        bg, fg, accent = "#0d1b2a", "#e0e1dd", "#e9c46a"
+        win = tk.Toplevel(self.root)
+        win.title("Patch Notes")
+        win.configure(bg=bg)
+        win.geometry("460x520")
+
+        tk.Label(win, text="Patch Notes", font=("Segoe UI", 18, "bold"),
+                 bg=bg, fg=accent).pack(pady=(16, 2))
+        tk.Label(win, text=f"Current version: v{VERSION}", font=("Segoe UI", 10),
+                 bg=bg, fg="#778da9").pack(pady=(0, 10))
+
+        # Scrollable area (canvas + inner frame).
+        outer = tk.Frame(win, bg=bg)
+        outer.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+        canvas = tk.Canvas(outer, bg=bg, highlightthickness=0)
+        scroll = tk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas, bg=bg)
+        inner.bind("<Configure>",
+                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=inner, anchor="nw", width=420)
+        canvas.configure(yscrollcommand=scroll.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+
+        def _on_wheel(e):
+            canvas.yview_scroll(int(-e.delta / 120), "units")
+        canvas.bind_all("<MouseWheel>", _on_wheel)
+        win.bind("<Destroy>", lambda e: canvas.unbind_all("<MouseWheel>"))
+
+        for version, date, changes in CHANGELOG:
+            block = tk.Frame(inner, bg="#1b263b")
+            block.pack(fill="x", pady=6)
+            tk.Label(block, text=f"v{version}  ·  {date}",
+                     font=("Segoe UI", 12, "bold"), bg="#1b263b", fg=accent,
+                     anchor="w").pack(fill="x", padx=12, pady=(8, 4))
+            for change in changes:
+                tk.Label(block, text=f"•  {change}", font=("Segoe UI", 10),
+                         bg="#1b263b", fg=fg, anchor="w", justify="left",
+                         wraplength=380).pack(fill="x", padx=12, pady=1)
+            tk.Frame(block, bg="#1b263b", height=6).pack()
 
     # ---------- settings ----------
     def open_settings(self):

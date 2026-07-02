@@ -101,6 +101,24 @@ latitude ~45.5°N, same timezone, so times are nearly identical).
 - Future option: a GitHub Actions workflow could build the exe in the cloud on
   each tag, removing even the local build step.
 
+## Version display + admin patch-notes page — added 2026-07-01
+- The main window now shows the version (`v{VERSION}`, clean semver) as a small
+  grey label under the "☪ Athan" title. Everyone sees this.
+- **`CHANGELOG`** (list near `VERSION` in `athan.py`, newest first): each entry is
+  `(version, date, [changes])`. **When you cut a release, add an entry at the TOP
+  and bump `VERSION` to match it** (a startup-time convention; the top CHANGELOG
+  version should equal `VERSION`).
+- **Admin gating via a key file:** `is_admin()` returns True iff a file named
+  **`admin.key`** sits next to the app (`app_dir()`). Only the developer's copy has
+  it, so public GitHub downloads never show patch notes. To enable it on your
+  machine, just create an empty `admin.key` next to `athan.py` (dev) or next to
+  `Athan.exe` (built). It's in `.gitignore` and not bundled by `build.bat`
+  (`--onefile`, no `--add-data`), so it never ships.
+- **"Patch Notes" button** appears in the main button row ONLY in admin mode and
+  opens a scrollable dark-themed window (`open_patch_notes()`) listing every
+  `CHANGELOG` entry (version + date header, changes as bullets, newest first).
+- Design spec: `docs/superpowers/specs/2026-07-01-version-patch-notes-design.md`.
+
 ## Build / run notes
 - To test without building: `python athan.py` (dev runs skip the updater).
 - Real settings persist in `config.json` next to the exe (in `dist\`), separate
