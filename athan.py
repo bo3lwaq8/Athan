@@ -498,25 +498,27 @@ class AthanApp:
             val.pack(side="right")
             self.rows[p] = val
 
+        # Two-column grid so the buttons wrap to a second row instead of
+        # overflowing (and clipping their labels) on the fixed-width window.
         btns = tk.Frame(self.root, bg=bg)
         btns.pack(pady=14)
-        tk.Button(btns, text="Settings", command=self.open_settings, bg=accent,
-                  fg="#0d1b2a", font=("Segoe UI", 10, "bold"), relief="flat",
-                  padx=14, pady=6).pack(side="left", padx=6)
-        tk.Button(btns, text="Refresh", command=lambda: self.refresh_times(),
-                  bg="#90e0ef", fg="#0d1b2a", font=("Segoe UI", 10, "bold"),
-                  relief="flat", padx=14, pady=6).pack(side="left", padx=6)
-        tk.Button(btns, text="Test athan", command=lambda: self.trigger_athan(),
-                  bg="#577590", fg="#e0e1dd", font=("Segoe UI", 10, "bold"),
-                  relief="flat", padx=14, pady=6).pack(side="left", padx=6)
-        self.update_btn = tk.Button(btns, text="Check for updates",
-                  command=self._manual_update_check, bg="#f4a261", fg="#0d1b2a",
-                  font=("Segoe UI", 10, "bold"), relief="flat", padx=14, pady=6)
-        self.update_btn.pack(side="left", padx=6)
+        specs = [
+            ("Settings", self.open_settings, accent, "#0d1b2a"),
+            ("Refresh", lambda: self.refresh_times(), "#90e0ef", "#0d1b2a"),
+            ("Test athan", lambda: self.trigger_athan(), "#577590", "#e0e1dd"),
+            ("Check for updates", self._manual_update_check, "#f4a261", "#0d1b2a"),
+        ]
         if is_admin():
-            tk.Button(btns, text="Patch Notes", command=self.open_patch_notes,
-                      bg="#2a9d8f", fg="#e0e1dd", font=("Segoe UI", 10, "bold"),
-                      relief="flat", padx=14, pady=6).pack(side="left", padx=6)
+            specs.append(("Patch Notes", self.open_patch_notes, "#2a9d8f", "#e0e1dd"))
+        for i, (text, cmd, bgc, fgc) in enumerate(specs):
+            b = tk.Button(btns, text=text, command=cmd, bg=bgc, fg=fgc,
+                          font=("Segoe UI", 10, "bold"), relief="flat",
+                          padx=14, pady=6)
+            b.grid(row=i // 2, column=i % 2, padx=6, pady=4, sticky="ew")
+            if text == "Check for updates":
+                self.update_btn = b
+        btns.grid_columnconfigure(0, weight=1, uniform="btn")
+        btns.grid_columnconfigure(1, weight=1, uniform="btn")
 
         self.status = tk.Label(self.root, text="", font=("Segoe UI", 9),
                                bg=bg, fg="#778da9")
