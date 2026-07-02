@@ -82,11 +82,15 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 # ---- auto-update (GitHub Releases) ----
 # Bump VERSION every time you cut a new release; the running app compares this
 # to the latest release tag and offers to update itself. See build.bat / README.
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # Patch notes shown on the admin-only "Patch Notes" page (newest first).
 # Each release: add an entry at the TOP and bump VERSION to match it.
 CHANGELOG = [
+    ("1.3.0", "2026-07-02", [
+        "Manual 'Check for updates' button with clear status feedback "
+        "(up to date / update available / couldn't check).",
+    ]),
     ("1.2.0", "2026-07-01", [
         "Show the app version under the title.",
         "Admin-only Patch Notes page (version history), unlocked by an admin.key file.",
@@ -179,12 +183,26 @@ def _parse_version(v):
     return tuple(nums) or (0,)
 
 
+class UpdateCheck:
+    """Result of check_for_update(). status is one of:
+      'available'   -> a newer release exists; .tag and .url are set
+      'current'     -> already on the latest version
+      'error'       -> couldn't reach GitHub / bad response; .message is set
+      'unsupported' -> dev run (not frozen) or 'requests' missing; can't self-update
+    The silent launch check only acts on 'available'; the manual button reports all."""
+    def __init__(self, status, tag=None, url=None, message=""):
+        self.status = status
+        self.tag = tag
+        self.url = url
+        self.message = message
+
+
 def check_for_update():
-    """Return (tag, download_url) if the latest GitHub release is newer than the
-    running VERSION, else None. Only meaningful for the built exe; a dev run
-    (python athan.py) can't swap itself, so we skip it. Never raises."""
+    """Query the latest GitHub release and classify the result as an UpdateCheck.
+    Never raises. Only the built exe can swap itself, so a dev run (python athan.py)
+    or a missing 'requests' returns 'unsupported'."""
     if requests is None or not getattr(sys, "frozen", False):
-        return None
+        return UpdateCheck("unsupported")
     try:
         r = requests.get(RELEASES_API, timeout=12,
                          headers={"Accept": "application/vnd.github+json"})
@@ -192,13 +210,15 @@ def check_for_update():
         data = r.json()
         tag = data.get("tag_name", "")
         if _parse_version(tag) <= _parse_version(VERSION):
-            return None
+            return UpdateCheck("current")
         for asset in data.get("assets", []):
             if asset.get("name") == UPDATE_ASSET:
-                return tag, asset.get("browser_download_url")
-    except Exception:
-        return None
-    return None
+                return UpdateCheck("available", tag=tag,
+                                   url=asset.get("browser_download_url"))
+        # Newer tag exists but no matching asset to download — treat as no update.
+        return UpdateCheck("current")
+    except Exception as e:
+        return UpdateCheck("error", message=str(e))
 
 
 def download_and_apply_update(url):
@@ -489,6 +509,10 @@ class AthanApp:
         tk.Button(btns, text="Test athan", command=lambda: self.trigger_athan(),
                   bg="#577590", fg="#e0e1dd", font=("Segoe UI", 10, "bold"),
                   relief="flat", padx=14, pady=6).pack(side="left", padx=6)
+        self.update_btn = tk.Button(btns, text="Check for updates",
+                  command=self._manual_update_check, bg="#f4a261", fg="#0d1b2a",
+                  font=("Segoe UI", 10, "bold"), relief="flat", padx=14, pady=6)
+        self.update_btn.pack(side="left", padx=6)
         if is_admin():
             tk.Button(btns, text="Patch Notes", command=self.open_patch_notes,
                       bg="#2a9d8f", fg="#e0e1dd", font=("Segoe UI", 10, "bold"),
@@ -971,12 +995,36 @@ class AthanApp:
 
     # ---------- auto-update ----------
     def _start_update_check(self):
+        """Silent check ~4s after launch: only speaks up if an update exists."""
         def work():
-            info = check_for_update()
-            if info:
-                tag, url = info
-                self.root.after(0, lambda: self._prompt_update(tag, url))
+            result = check_for_update()
+            if result.status == "available":
+                self.root.after(0, lambda: self._prompt_update(result.tag, result.url))
         threading.Thread(target=work, daemon=True).start()
+
+    def _manual_update_check(self):
+        """User pressed 'Check for updates': report the result in every case."""
+        self.update_btn.config(state="disabled")
+        self.status.config(text="Checking for updates…")
+
+        def work():
+            result = check_for_update()
+            self.root.after(0, lambda: self._show_update_result(result))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _show_update_result(self, result):
+        self.update_btn.config(state="normal")
+        if result.status == "available":
+            self.status.config(text="")
+            self._prompt_update(result.tag, result.url)
+        elif result.status == "current":
+            self.status.config(text=f"You're on the latest version (v{VERSION}).")
+        elif result.status == "unsupported":
+            self.status.config(
+                text="Update checks are only available in the installed app.")
+        else:  # error
+            self.status.config(
+                text="Couldn't check for updates — check your connection.")
 
     def _prompt_update(self, tag, url):
         if not messagebox.askyesno(
